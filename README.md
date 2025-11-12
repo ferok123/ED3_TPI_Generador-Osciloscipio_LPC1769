@@ -19,6 +19,11 @@ El sistema combina en una misma plataforma la **generación y visualización de 
   - Adquisición de señales analógicas.
   - Visualización en PC o dispositivo móvil.
   - Comunicación vía puerto serial / USB.
+ 
+---
+### SEP:
+
+![SEP] (Documentos/SEP.png)
 
 ---
 
