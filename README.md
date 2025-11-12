@@ -23,7 +23,7 @@ El sistema combina en una misma plataforma la **generación y visualización de 
 ---
 ### SEP:
 
-![SEP] (Documentos/SEP.png)
+![SEP](Documentos/SEP.png)
 
 ---
 
