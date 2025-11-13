@@ -31,7 +31,7 @@ typedef enum {
   FS_1K,
   FS_10K,
   FS_SIZE	//TAMAÑO TOTAL
-}fs_t
+}fs_t;
 
 static fs_t select_fs = FS_1; //INICIALIZO EN 1HZ, ESTA LUEGO SE LLAMARA EN DAC PARA CAMBIAR SU FREC
 
@@ -56,10 +56,10 @@ void confDAC(void);
 //FUNCION PRINCIPAL:
 int main()
 {
-  confPines(void);
-	confIntExt(void);
-  confADC(void);
-	confDAC(void);
+  confPines();
+	confIntExt();
+  confADC();
+	confDAC();
   while(1)
   {
     
@@ -147,19 +147,19 @@ void confIntExt(void)
   //LIMPIO FLAGS
   EXTI_Init();
   //EINT0:
-  EXTI_Init_Typedef pinEINT;
+  EXTI_InitTypedef pinEINT;
   pinEINT.EXTI_Line = EXTI_EINT0; //EINT0
   pinEINT.EXTI_Mode = EXTI_MODE_EDGE_SENSITIVE;
   pinEINT.EXTI_polarity = EXTI_POLARITY_LOW_ACTIVE_OR_FALLING_EDGE;
-  EXTI_Confg(pinEINT);
+  EXTI_Confg(&pinEINT);
   
   //EINT1
   pinEINT.EXTI_Line = EXTI_EINT1;
-  EXTI_Confg(pinEINT);
+  EXTI_Confg(&pinEINT);
   
   //EINT2
   pinEINT.EXTI_Line = EXTI_EINT2;
-  EXTI_Confg(pinEINT);
+  EXTI_Confg(&pinEINT);
   
   //HABILITACION INTERRUPCION
   NVIC_EnableIRQ(EINT0_IRQn);
