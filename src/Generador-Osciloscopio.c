@@ -57,9 +57,9 @@ void confDAC(void);
 int main()
 {
   confPines();
-	confIntExt();
+  confIntExt();
   confADC();
-	confDAC();
+  confDAC();
   while(1)
   {
     
