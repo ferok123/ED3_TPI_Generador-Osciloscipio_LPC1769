@@ -1,10 +1,10 @@
- /**
+/**
  * @file Generador-Osciloscopio.c
  * @brief Generador de funciones / Osciloscopio con LPC1769
  *
  * Este programa implementa un generador de señales (senoidal, cuadrada y triangular)
  * y una función de osciloscopio que permite visualizar señales adquiridas.
- * 
+ *
  * @authores Choque, Fernando  Muñoz, Jose Luis  Mendoza, Marcos Julian
  * @date Noviembre 2025
  * @version 1.0
@@ -60,7 +60,7 @@ typedef enum {
 }wf_t;
 
 static wf_t select_wf = CUADRADA; //INICIALIZO CON LA FORMA DE ONDA CUADRADA
-  
+
 //VARIABLES GLOBALES:
 volatile uint32_t *dac_samples = (volatile uint32_t *)DAC_BUFFER_START;
 uint16_t adc_value_CH0 = 0;
@@ -121,15 +121,15 @@ int main()
   confDAC();
   while(1)
   {
-    
+
   }
-  
+
   return 0;
 }
 
 /**
  * @brief Configuramos Funcionalidad de cada pin.
- * 
+ *
  * @return void
  */
 void confPines(void)
@@ -143,7 +143,7 @@ void confPines(void)
 	pinEINT0.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
   PINSEL_ConfigPin(&pinEINT0);
 
-  
+
   //EINT1 -> SELECCION DE AMPLITUD
   PINSEL_CFG_Type pinEINT1; //EINT 1 EN P2.11
 	pinEINT1.Portnum = PINSEL_PORT_2; //SELECCION DE PUERTO
@@ -152,7 +152,7 @@ void confPines(void)
 	pinEINT1.Pinmode = PINSEL_PINMODE_PULLUP;//PULL-UP
 	pinEINT1.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
   PINSEL_ConfigPin(&pinEINT1);
-  
+
   //EINT2 -> SELECCION DE BASE DE TIEMPO
   PINSEL_CFG_Type pinEINT2; //EINT 2 EN P2.12
 	pinEINT2.Portnum = PINSEL_PORT_2;
@@ -161,7 +161,7 @@ void confPines(void)
 	pinEINT2.Pinmode = PINSEL_PINMODE_PULLUP;//PULL-UP
 	pinEINT2.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
   PINSEL_ConfigPin(&pinEINT2);
-  
+
 
   //CONFIGURMAOS PIN DAC P0.26
 	PINSEL_CFG_Type pinDAC = {0};
@@ -171,7 +171,7 @@ void confPines(void)
 	pinDAC.Pinmode = PINSEL_PINMODE_TRISTATE; //PIN FLOTANTE, SIN PULL-UP NI PULL-DOWN
 	pinDAC.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PINSEL_ConfigPin(&pinDAC); //CARGAMOS LOS PARAMETROS DE LA ESTRUCTURA CON ESTO CONFIGRUAMOS EL PIN DEL DAC
-  
+
 	//CONFIGURAMOS PIN ADC A0.0 P0.23
 	PINSEL_CFG_Type pinADC; // P0.23 AD0.0 FUNCION_1
 	pinADC.Portnum = PINSEL_PORT_0;
@@ -180,25 +180,25 @@ void confPines(void)
 	pinADC.Pinmode = PINSEL_PINMODE_TRISTATE; //PIN FLOTANTE, SIN PULL-UP NI PULL-DOWN
 	pinADC.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PINSEL_ConfigPin(&pinADC);
-  
+
   //CONFIGURAMOS TX2 P0.10
   PINSEL_CFG_Type  pinTXD2 = {0};
   pinTXD2.Portnum = PINSEL_PORT_0;
   pinTXD2.Pinnum = PINSEL_PIN_10;
-	pinTXD2.Funcnum = PINSEL_FUNC_1;
-	pinTXD2.Pinmode = PINSEL_PINMODE_TRISTATE; //PIN FLOTANTE, SIN PULL-UP NI PULL-DOWN, EL PERIFERICO LUEGO MANEJA EL NIVEL
-	pinTXD2.OpenDrain = PINSEL_PINMODE_NORMAL;
-	PINSEL_ConfigPin(&pinTXD2);
-  
+  pinTXD2.Funcnum = PINSEL_FUNC_1;
+  pinTXD2.Pinmode = PINSEL_PINMODE_TRISTATE; //PIN FLOTANTE, SIN PULL-UP NI PULL-DOWN, EL PERIFERICO LUEGO MANEJA EL NIVEL
+  pinTXD2.OpenDrain = PINSEL_PINMODE_NORMAL;
+  PINSEL_ConfigPin(&pinTXD2);
+
   //CONFIGURAMOS RX2 P0.11
   PINSEL_CFG_Type  pinRXD2 = {0};
   pinRXD2.Portnum = PINSEL_PORT_0;
   pinRXD2.Pinnum = PINSEL_PIN_11;
-	pinRXD2.Funcnum = PINSEL_FUNC_1;
-	pinRXD2.Pinmode = PINSEL_PINMODE_PULLUP; //PIN CON PULL-UPM MANTIENE UN VALOR ALTO CUANDO NO HAY TRANSMISION PARA EVITAR LECTURAS ERRATICAS O RUIDO CUANDO LA LINEA ESTA LIBRE
-	pinRXD2.OpenDrain = PINSEL_PINMODE_NORMAL;
-	PINSEL_ConfigPin(&pinRXD2);
-  
+  pinRXD2.Funcnum = PINSEL_FUNC_1;
+  pinRXD2.Pinmode = PINSEL_PINMODE_PULLUP; //PIN CON PULL-UPM MANTIENE UN VALOR ALTO CUANDO NO HAY TRANSMISION PARA EVITAR LECTURAS ERRATICAS O RUIDO CUANDO LA LINEA ESTA LIBRE
+  pinRXD2.OpenDrain = PINSEL_PINMODE_NORMAL;
+  PINSEL_ConfigPin(&pinRXD2);
+
 }
 
 void confIntExt(void)
@@ -206,20 +206,20 @@ void confIntExt(void)
   //LIMPIO FLAGS
   EXTI_Init();
   //EINT0:
-  EXTI_InitTypedef pinEINT;
+  EXTI_InitTypeDef pinEINT;
   pinEINT.EXTI_Line = EXTI_EINT0; //EINT0
   pinEINT.EXTI_Mode = EXTI_MODE_EDGE_SENSITIVE;
   pinEINT.EXTI_polarity = EXTI_POLARITY_LOW_ACTIVE_OR_FALLING_EDGE;
-  EXTI_Confg(&pinEINT);
-  
+  EXTI_Config(&pinEINT);
+
   //EINT1
   pinEINT.EXTI_Line = EXTI_EINT1;
-  EXTI_Confg(&pinEINT);
-  
+  EXTI_Config(&pinEINT);
+
   //EINT2
   pinEINT.EXTI_Line = EXTI_EINT2;
-  EXTI_Confg(&pinEINT);
-  
+  EXTI_Config(&pinEINT);
+
   //HABILITACION INTERRUPCION
   NVIC_EnableIRQ(EINT0_IRQn);
   NVIC_EnableIRQ(EINT1_IRQn);
@@ -231,12 +231,12 @@ void confADC(void)
   //ADC:
   ADC_Init(LPC_ADC, FREC_ADC); //ADC SAMPLES A 200KHz
   ADC_BurstCmd(LPC_ADC, ENABLE);	//CONVERSION EN RAFAGA O BURST ->CONVIERTE DE FORMA CONTINUA -<ACABA UNA CONVERSION Y SIGUE CON LA OTRA
-  
+
   //CHANNEL 0:
   ADC_ChannelCmd(LPC_ADC, ADC_CHANNEL_0, ENABLE);	//HABILITAMOS EL CANAL0
-  ADC_IntConfig(LPC_ADC, ADC_ADINTEN0, ENABLE); //HABILITAMOS INTERRUPCION PARA CANAL0  
-  
-	NVIC_EnableIRQ(ADC_IRQn); //HABILITAMOS INTERRUPCION DE ADC PARA EL CORE
+  ADC_IntConfig(LPC_ADC, ADC_ADINTEN0, ENABLE); //HABILITAMOS INTERRUPCION PARA CANAL0
+
+  NVIC_EnableIRQ(ADC_IRQn); //HABILITAMOS INTERRUPCION DE ADC PARA EL CORE
 }
 
 void confDAC()
@@ -300,7 +300,7 @@ void EINT0_IRQHandler(){
 
 //INTERRUPCION PARA SELECCION DE LA AMPLITUD
 void EINT1_IRQHandler(){
-  
+
   EXTI_ClearEXTIFlag(EXTI_EINT1);
 }
 
@@ -357,7 +357,6 @@ void genWaveForms ()
 {
   gen_cuadrada();
   gen_triangular();
-  gen_senoidal();
 }
 void saveWaveForm(wf_t select)
 {
@@ -392,4 +391,3 @@ void saveWaveForm(wf_t select)
   	break;
   }
 }
-
