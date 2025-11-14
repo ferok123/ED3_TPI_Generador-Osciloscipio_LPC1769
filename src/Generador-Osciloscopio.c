@@ -67,7 +67,37 @@ uint16_t adc_value_CH0 = 0;
 
 uint16_t triangular[WAVEFORM_SIZE];		//VECTORES CON FORMAS DE ONDAS
 uint16_t cuadrada[WAVEFORM_SIZE];
-//uint16_t senoidal[WAVEFORM_SIZE];
+uint16_t senoidal[WAVEFORM_SIZE] = {
+	512, 520, 528, 536, 544, 552, 560, 568, 576, 584,
+	592, 600, 608, 616, 624, 632, 640, 648, 655, 663,
+	671, 679, 686, 694, 701, 709, 716, 723, 730, 737,
+	744, 751, 758, 765, 771, 778, 784, 790, 796, 802,
+	808, 814, 819, 825, 830, 835, 841, 846, 850, 855,
+	860, 864, 868, 872, 876, 880, 883, 887, 890, 893,
+	896, 898, 901, 903, 905, 906, 908, 909, 910, 911,
+	911, 912, 912, 912, 911, 911, 910, 909, 908, 906,
+	905, 903, 901, 898, 896, 893, 890, 887, 883, 880,
+	876, 872, 868, 864, 860, 855, 850, 846, 841, 835,
+	830, 825, 819, 814, 808, 802, 796, 790, 784, 778,
+	771, 765, 758, 751, 744, 737, 730, 723, 716, 709,
+	701, 694, 686, 679, 671, 663, 655, 648, 640, 632,
+	624, 616, 608, 600, 592, 584, 576, 568, 560, 552,
+	544, 536, 528, 520, 512, 504, 496, 488, 480, 472,
+	464, 456, 448, 440, 432, 424, 416, 408, 400, 392,
+	384, 376, 369, 361, 353, 346, 338, 330, 323, 315,
+	308, 300, 293, 286, 279, 272, 265, 259, 252, 246,
+	240, 234, 229, 223, 218, 213, 207, 203, 198, 193,
+	188, 184, 180, 176, 172, 168, 165, 161, 158, 155,
+	152, 150, 147, 145, 143, 141, 139, 138, 137, 136,
+	136, 135, 135, 135, 136, 136, 137, 138, 139, 141,
+	143, 145, 147, 150, 152, 155, 158, 161, 165, 168,
+	172, 176, 180, 184, 188, 193, 198, 203, 207, 213,
+	218, 223, 229, 234, 240, 246, 252, 259, 265, 272,
+	279, 286, 293, 300, 308, 315, 323, 330, 338, 346,
+	353, 361, 369, 376, 384, 392, 400, 408, 416, 424,
+	432, 440, 448, 456, 464, 472, 480, 488, 496, 504,
+	};
+
 
 //PROTOTIPO DE FUNCIONES:
 void confPines(void);
@@ -75,10 +105,16 @@ void confIntExt(void);
 void confTimer(void);
 void confADC(void);
 void confDAC(void);
+void confGPDMA(void);
+void saveWaveForm(wf_t select);
+void gen_cuadrada(void);
+void gen_triangular(void);
+void genWaveForms(void);
 
 //FUNCION PRINCIPAL:
 int main()
 {
+  genWaveForms(); //GENERAMOS TODAS LAS FORMAS DE ONDAS
   confPines();
   confIntExt();
   confADC();
@@ -255,23 +291,105 @@ void ADC_IRQHandler()	//CADA VEZ QUE TERMINA LA CONVERSION DE UN CANAL ENTRA
 		adc_value_CH0 = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);		//GUARDO DATO EN adc_value_CH0
 }
 
-//INTERRUPCION PARA SELECCION DE LA FORMA DE ONDA
 void EINT0_IRQHandler(){
-  
+
+  select_wf = (select_wf + 1)%CANT_WF; //BUFFER CIRCULAR DE FORMAS DE ONDAS
+  saveWaveForm(select_wf);
   EXTI_ClearEXTIFlag(EXTI_EINT0);
 }
+
 //INTERRUPCION PARA SELECCION DE LA AMPLITUD
 void EINT1_IRQHandler(){
   
   EXTI_ClearEXTIFlag(EXTI_EINT1);
 }
+
 //INTERRUPCION PARA SELECCION DE LA BASE DE TIEMPO
 void EINT2_IRQHandler(){
-  
+
   select_fs = (select_fs + 1) % FS_SIZE;  //BUFFFER CIRCULAR DE FRECUENCIAS
   confDAC();
-  
+
   EXTI_ClearEXTIFlag(EXTI_EINT2);
 }
 
+
+void gen_triangular()
+{
+  uint16_t index=0;
+  //CUADRANTE 1:
+  for(uint16_t i=0; i<CUADRANTE; i++)
+  {
+    triangular[index++] = DAC_OFFSET + (DAC_MAX - DAC_OFFSET) * ((float) i/ (CUADRANTE-1));
+  }
+  //CUADRANTE 2:
+  for(uint16_t i=0; i<CUADRANTE; i++)
+  {
+    triangular[index++] = DAC_MAX - ( DAC_OFFSET- DAC_MAX) * ((float) i/ (CUADRANTE-1));
+  }
+  //CUADRANTE 3:
+  for(uint16_t i=0; i<CUADRANTE; i++)
+  {
+    triangular[index++] = DAC_OFFSET - (DAC_OFFSET - DAC_MIN) * ((float) i/ (CUADRANTE-1));
+  }
+  //CUADRANTE 4:
+  for(uint16_t i=0; index<WAVEFORM_SIZE; i++)
+  {
+    triangular[index++] = DAC_MIN + (DAC_OFFSET - DAC_MIN) * ((float) i/ (CUADRANTE-1));
+  }
+
+}
+
+void gen_cuadrada()
+{
+  for(uint16_t i=0; i<WAVEFORM_SIZE_HALF; i++)
+  {
+    cuadrada[i] = DAC_MAX;
+  }
+
+  for(uint16_t i=WAVEFORM_SIZE_HALF; i<WAVEFORM_SIZE; i++)
+  {
+    cuadrada[i] = DAC_MIN;
+  }
+}
+
+void genWaveForms ()
+{
+  gen_cuadrada();
+  gen_triangular();
+  gen_senoidal();
+}
+void saveWaveForm(wf_t select)
+{
+  volatile uint32_t *index = dac_samples; //INICIO DE DE GUARDADO DE FORMA DE ONDA
+  switch(select)
+  {
+    case CUADRADA:
+  		for(uint32_t i=0; i<WAVEFORM_SIZE; i++)
+      {
+        *index = cuadrada[i]<<6;
+        index++;
+      }
+  	break;
+
+    case TRIANGULAR:
+  		for(uint32_t i=0; i<WAVEFORM_SIZE; i++)
+      {
+        *index = triangular[i]<<6;
+        index++;
+      }
+  	break;
+
+    case SENOIDAL:
+  		for(uint32_t i=0; i<WAVEFORM_SIZE; i++)
+      {
+        *index = senoidal[i]<<6;
+        index++;
+      }
+  	break;
+
+  	default:
+  	break;
+  }
+}
 
