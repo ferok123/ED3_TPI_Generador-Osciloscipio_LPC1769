@@ -23,6 +23,13 @@
 
 //DEFINICION DE MACROS Y CONSTANTES:
 #define FREC_ADC 200000
+#define DAC_BUFFER_START 0X2007C000
+#define WAVEFORM_SIZE 382
+#define WAVEFORM_SIZE_HALF 191
+#define CUADRANTE 95
+#define DAC_OFFSET 512
+#define DAC_MAX	1023
+#define DAC_MIN 0
 //GENERAMOS LAS OPCIONES DE FRECUENCIA PARA EL TIMEOUT DEL DAC
 typedef enum {
   FS_1 = 0,
@@ -43,8 +50,24 @@ static const uint32_t DAC_frec[FS_SIZE] ={  //EL NUMERO LUEGO HAY QUE CALCULARLO
   6				//TICKS -> 10KHz
 };
 
+//GENERAMOS LAS OPCIONES DE FORMA DE ONDA
+typedef enum {
+  CUADRADA = 0,
+  TRIANGULAR,
+  SENOIDAL,
+  DIENTE_SIERRA,
+  CANT_WF	//TAMAÑO TOTAL
+}wf_t;
+
+static wf_t select_wf = CUADRADA; //INICIALIZO CON LA FORMA DE ONDA CUADRADA
+  
 //VARIABLES GLOBALES:
+volatile uint32_t *dac_samples = (volatile uint32_t *)DAC_BUFFER_START;
 uint16_t adc_value_CH0 = 0;
+
+uint16_t triangular[WAVEFORM_SIZE];		//VECTORES CON FORMAS DE ONDAS
+uint16_t cuadrada[WAVEFORM_SIZE];
+//uint16_t senoidal[WAVEFORM_SIZE];
 
 //PROTOTIPO DE FUNCIONES:
 void confPines(void);
@@ -197,6 +220,34 @@ void confDAC()
 
 	DAC_SetDMATimeOut(LPC_DAC, countDAC); //CARGO LA CUENTAS AL CONTADOR DEDICADO DEL DAC
 }
+
+void confGPDMA(void){
+	GPDMA_Init();
+	NVIC_DisableIRQ(DMA_IRQn);
+	GPDMA_LLI_Type conf_LLI0_DAC;
+	conf_LLI0_DAC.SrcAddr = (uint32_t)dac_samples;
+	conf_LLI0_DAC.DstAddr = (uint32_t)&(LPC_DAC->DACR);
+	conf_LLI0_DAC.NextLLI = (uint32_t)&conf_LLI0_DAC;
+	conf_LLI0_DAC.Control = ((WAVEFORM_SIZE<<0)
+							|(2<<18)
+							|(2<<21)
+							|(1<<26))
+							&~(1<<27);
+
+	GPDMA_Channel_CFG_Type  conf_CH0_DAC={0};
+	conf_CH0_DAC.ChannelNum    = 0;
+	conf_CH0_DAC.TransferSize  = WAVEFORM_SIZE;
+	conf_CH0_DAC.TransferWidth = 0;
+	conf_CH0_DAC.SrcMemAddr    = (uint32_t)dac_samples;
+	conf_CH0_DAC.DstMemAddr    = 0;
+	conf_CH0_DAC.TransferType  = GPDMA_TRANSFERTYPE_M2P;
+	conf_CH0_DAC.SrcConn       = 0;
+	conf_CH0_DAC.DstConn       = GPDMA_CONN_DAC;
+	conf_CH0_DAC.DMALLI        = (uint32_t)&conf_LLI0_DAC;
+	GPDMA_Setup(&conf_CH0_DAC);
+	GPDMA_ChannelCmd(0,ENABLE);
+}
+
 
 void ADC_IRQHandler()	//CADA VEZ QUE TERMINA LA CONVERSION DE UN CANAL ENTRA
 {
