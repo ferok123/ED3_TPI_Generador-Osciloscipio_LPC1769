@@ -23,7 +23,10 @@
 
 //DEFINICION DE MACROS Y CONSTANTES:
 #define FREC_ADC 200000
-#define DAC_BUFFER_START 0X2007C000
+#define DAC_BUFFER_START_0 0X2007C000 //CUADRADA
+#define DAC_BUFFER_START_1 0X2007D000	//TRIANGULAR
+#define DAC_BUFFER_START_2 0X2007E000 //SENOIDAL
+
 #define WAVEFORM_SIZE 382
 #define WAVEFORM_SIZE_HALF 191
 #define CUADRANTE 95
@@ -36,18 +39,18 @@ typedef enum {
   FS_10,
   FS_100,
   FS_1K,
-  FS_10K,
+ FS_2K,
   FS_SIZE	//TAMAÑO TOTAL
 }fs_t;
 
 static fs_t select_fs = FS_1; //INICIALIZO EN 1HZ, ESTA LUEGO SE LLAMARA EN DAC PARA CAMBIAR SU FREC
 
 static const uint32_t DAC_frec[FS_SIZE] ={  //EL NUMERO LUEGO HAY QUE CALCULARLO PARA CADA FREC CORRESPONDIENTE
-	65535,   //TICKS -> 1Hz
-  6553,		//TICKS -> 10Hz
-  655,		//TICKS -> 100Hz
+	65445,   //TICKS -> 1Hz
+  6545,		//TICKS -> 10Hz
+  654,		//TICKS -> 100Hz
   65,			//TICKS -> 1kHz
-  6				//TICKS -> 10KHz
+  33				//TICKS -> 33KHz
 };
 
 //GENERAMOS LAS OPCIONES DE FORMA DE ONDA
@@ -55,48 +58,47 @@ typedef enum {
   CUADRADA = 0,
   TRIANGULAR,
   SENOIDAL,
-  DIENTE_SIERRA,
+ // DIENTE_SIERRA,
   CANT_WF	//TAMAÑO TOTAL
 }wf_t;
 
-static wf_t select_wf = SENOIDAL; //INICIALIZO CON LA FORMA DE ONDA CUADRADA
+static wf_t select_wf = CUADRADA; //INICIALIZO CON LA FORMA DE ONDA CUADRADA
 
 //VARIABLES GLOBALES:
-volatile uint32_t *dac_samples = (volatile uint32_t *)DAC_BUFFER_START;
+volatile uint32_t *dac_samples_0 = (volatile uint32_t *)DAC_BUFFER_START_0;
+volatile uint32_t *dac_samples_1 = (volatile uint32_t *)DAC_BUFFER_START_1;
+volatile uint32_t *dac_samples_2 = (volatile uint32_t *)DAC_BUFFER_START_2;
+
 uint16_t adc_value_CH0 = 0;
 
 uint16_t triangular[WAVEFORM_SIZE];		//VECTORES CON FORMAS DE ONDAS
 uint16_t cuadrada[WAVEFORM_SIZE];
 uint16_t senoidal[WAVEFORM_SIZE] = {
-		512, 520, 528, 536, 544, 552, 560, 568, 576, 584,
-		592, 600, 608, 616, 624, 632, 640, 648, 656, 664,
-		672, 680, 688, 696, 703, 711, 718, 726, 733, 740,
-		748, 755, 762, 769, 776, 782, 789, 795, 801, 807,
-		813, 819, 824, 830, 835, 840, 845, 850, 855, 859,
-		864, 868, 872, 875, 879, 882, 885, 888, 891, 893,
-		895, 897, 899, 901, 902, 903, 904, 904, 905, 904,
-		904, 903, 902, 901, 899, 897, 895, 893, 891, 888,
-		885, 882, 879, 875, 872, 868, 864, 859, 855, 850,
-		845, 840, 835, 830, 824, 819, 813, 807, 801, 795,
-		789, 782, 776, 769, 762, 755, 748, 740, 733, 726,
-		718, 711, 703, 696, 688, 680, 672, 664, 656, 648,
-		640, 632, 624, 616, 608, 600, 592, 584, 576, 568,
-		560, 552, 544, 536, 528, 520, 512, 504, 496, 488,
-		480, 472, 464, 456, 448, 440, 432, 424, 416, 408,
-		400, 392, 384, 376, 369, 361, 353, 346, 338, 330,
-		323, 315, 308, 300, 293, 286, 279, 272, 265, 259,
-		252, 246, 240, 234, 229, 223, 218, 213, 207, 203,
-		198, 193, 188, 184, 180, 176, 172, 168, 165, 161,
-		158, 155, 152, 150, 147, 145, 143, 141, 139, 138,
-		137, 136, 136, 135, 135, 135, 136, 136, 137, 138,
-		139, 141, 143, 145, 147, 150, 152, 155, 158, 161,
-		165, 168, 172, 176, 180, 184, 188, 193, 198, 203,
-		207, 213, 218, 223, 229, 234, 240, 246, 252, 259,
-		265, 272, 279, 286, 293, 300, 308, 315, 323, 330,
-		338, 346, 353, 361, 369, 376, 384, 392, 400, 408,
-		416, 424, 432, 440, 448, 456, 464, 472, 480, 488,
-		496, 504, 512
-		};
+	    512, 520, 528, 537, 545, 554, 562, 570, 579, 587, 595, 604, 612, 620, 628, 636,
+	    645, 653, 661, 669, 677, 685, 693, 700, 708, 716, 724, 731, 739, 746, 754, 761,
+	    768, 776, 783, 790, 797, 804, 811, 818, 824, 831, 837, 844, 850, 856, 863, 869,
+	    875, 881, 886, 892, 898, 903, 908, 914, 919, 924, 929, 934, 938, 943, 947, 952,
+	    956, 960, 964, 968, 972, 975, 979, 982, 985, 988, 991, 994, 997, 1000, 1002, 1004,
+	    1006, 1009, 1010, 1012, 1014, 1015, 1017, 1018, 1019, 1020, 1021, 1022, 1022, 1023, 1023, 1023,
+	    1023, 1023, 1023, 1022, 1022, 1021, 1020, 1019, 1018, 1017, 1015, 1014, 1012, 1010, 1009, 1006,
+	    1004, 1002, 1000, 997, 994, 991, 988, 985, 982, 979, 975, 972, 968, 964, 960, 956,
+	    952, 947, 943, 938, 934, 929, 924, 919, 914, 908, 903, 898, 892, 886, 881, 875,
+	    869, 863, 856, 850, 844, 837, 831, 824, 818, 811, 804, 797, 790, 783, 776, 768,
+	    761, 754, 746, 739, 731, 724, 716, 708, 700, 693, 685, 677, 669, 661, 653, 645,
+	    636, 628, 620, 612, 604, 595, 587, 579, 570, 562, 554, 545, 537, 528, 520, 512,
+	    503, 495, 486, 478, 469, 461, 453, 444, 436, 428, 419, 411, 403, 395, 387, 378,
+	    370, 362, 354, 346, 338, 330, 323, 315, 307, 299, 292, 284, 277, 269, 262, 255,
+	    247, 240, 233, 226, 219, 212, 205, 199, 192, 186, 179, 173, 167, 160, 154, 148,
+	    142, 137, 131, 125, 120, 115, 109, 104, 99, 94, 89, 85, 80, 76, 71, 67,
+	    63, 59, 55, 51, 48, 44, 41, 38, 35, 32, 29, 26, 23, 21, 19, 17,
+	    14, 13, 11, 9, 8, 6, 5, 4, 3, 2, 1, 1, 0, 0, 0, 0,
+	    0, 0, 1, 1, 2, 3, 4, 5, 6, 8, 9, 11, 13, 14, 17, 19,
+	    21, 23, 26, 29, 32, 35, 38, 41, 44, 48, 51, 55, 59, 63, 67, 71,
+	    76, 80, 85, 89, 94, 99, 104, 109, 115, 120, 125, 131, 137, 142, 148, 154,
+	    160, 167, 173, 179, 186, 192, 199, 205, 212, 219, 226, 233, 240, 247, 255, 262,
+	    269, 277, 284, 292, 299, 307, 315, 323, 330, 338, 346, 354, 362, 370, 378, 387,
+	    395, 403, 411, 419, 428, 436, 444, 453, 461, 469, 478, 486, 495, 503
+	};
 
 
 //PROTOTIPO DE FUNCIONES:
@@ -105,9 +107,8 @@ void confIntExt(void);
 void confTimer(void);
 void confADC(void);
 void confDAC(void);
-void confDAC_OFF(void);
-void confGPDMA(void);
-void saveWaveForm(wf_t select);
+void confGPDMA(wf_t select);
+void saveWaveForm();
 void gen_cuadrada(void);
 void gen_triangular(void);
 void genWaveForms(void);
@@ -116,12 +117,12 @@ void genWaveForms(void);
 int main()
 {
   genWaveForms(); //GENERAMOS TODAS LAS FORMAS DE ONDAS
-  saveWaveForm(select_wf); // LA QUE ESTA POR DEFECTO
+  saveWaveForm(); // LA QUE ESTA POR DEFECTO
   confPines();
   confIntExt();
   confADC();
   confDAC();
-  confGPDMA();
+ // confGPDMA(select_wf);
   while(1)
   {
 
@@ -244,7 +245,7 @@ void confADC(void)
 
 void confDAC()
 {
-  uint32_t countDAC = 65535; //NUMERO DE CUENTAS PARA EL CONTADOR INTERNO DE 16 BITS DEL DAC (valor maximo 65535)->  2,65mS
+  uint32_t countDAC = DAC_frec[select_fs]; //NUMERO DE CUENTAS PARA EL CONTADOR INTERNO DE 16 BITS DEL DAC (valor maximo 65535)->  2,65mS
 
 	DAC_CONVERTER_CFG_Type confDAC = {0};
 	confDAC.CNT_ENA = ENABLE;		//HABILITA EL CONTADOR DEL DAC, FUNCIONA DE TRIGGER PARA EL DMA TAMBIEN
@@ -258,40 +259,80 @@ void confDAC()
 	DAC_SetDMATimeOut(LPC_DAC, countDAC); //CARGO LA CUENTAS AL CONTADOR DEDICADO DEL DAC
 }
 
-void confDAC_OFF()
-{
-	DAC_CONVERTER_CFG_Type confDAC = {0};
-	confDAC.CNT_ENA = DISABLE;		//HABILITA EL CONTADOR DEL DAC, FUNCIONA DE TRIGGER PARA EL DMA TAMBIEN
-	confDAC.DMA_ENA = DISABLE;		//HABILITO DMA PARA DAC
-	confDAC.DBLBUF_ENA = DISABLE;	//NO SE USA --> YA QUE USO DMA
+void confGPDMA(wf_t select){
 
-	DAC_ConfigDAConverterControl(LPC_DAC, &confDAC);
-}
-
-void confGPDMA(void){
 	GPDMA_Init();
 	NVIC_DisableIRQ(DMA_IRQn);
-	GPDMA_LLI_Type conf_LLI0_DAC;
-	conf_LLI0_DAC.SrcAddr = (uint32_t)dac_samples;
-	conf_LLI0_DAC.DstAddr = (uint32_t)&(LPC_DAC->DACR);
-	conf_LLI0_DAC.NextLLI = (uint32_t)&conf_LLI0_DAC;
-	conf_LLI0_DAC.Control = ((WAVEFORM_SIZE<<0)
-							|(2<<18)
-							|(2<<21)
-							|(1<<26))
-							&~(1<<27);
 
 	GPDMA_Channel_CFG_Type  conf_CH0_DAC={0};
+
+	  //ALTERNATIVA PARA CAMBIO DE FORMA DE ONDA :D
+	    switch(select)
+	  {
+	    case CUADRADA:
+	    	static GPDMA_LLI_Type conf_LLI0_DAC;
+	    	conf_LLI0_DAC.SrcAddr = (uint32_t)dac_samples_0;
+	    	conf_LLI0_DAC.DstAddr = (uint32_t)&(LPC_DAC->DACR);
+	    	conf_LLI0_DAC.NextLLI = (uint32_t)&conf_LLI0_DAC;
+	    	conf_LLI0_DAC.Control = ((WAVEFORM_SIZE<<0)
+	    							|(2<<18)
+	    							|(2<<21)
+	    							|(1<<26))
+	    							&~(1<<27);
+	    	conf_CH0_DAC.SrcMemAddr    = (uint32_t)dac_samples_0; //cambio*
+	    	conf_CH0_DAC.DMALLI        = (uint32_t)&conf_LLI0_DAC;
+
+
+	  	break;
+
+	    case TRIANGULAR:
+	    	static GPDMA_LLI_Type conf_LLI1_DAC;
+	    	conf_LLI1_DAC.SrcAddr = (uint32_t)dac_samples_1;
+	    	conf_LLI1_DAC.DstAddr = (uint32_t)&(LPC_DAC->DACR);
+	    	conf_LLI1_DAC.NextLLI = (uint32_t)&conf_LLI1_DAC;
+	    	conf_LLI1_DAC.Control = ((WAVEFORM_SIZE<<0)
+	    							|(2<<18)
+	    							|(2<<21)
+	    							|(1<<26))
+	    							&~(1<<27);
+	    	conf_CH0_DAC.SrcMemAddr    = (uint32_t)dac_samples_1; //cambio*
+	    	conf_CH0_DAC.DMALLI        = (uint32_t)&conf_LLI1_DAC;
+
+
+
+	  	break;
+
+	    case SENOIDAL:
+	    	static GPDMA_LLI_Type conf_LLI2_DAC;
+	    	conf_LLI2_DAC.SrcAddr = (uint32_t)dac_samples_2;
+	    	conf_LLI2_DAC.DstAddr = (uint32_t)&(LPC_DAC->DACR);
+	    	conf_LLI2_DAC.NextLLI = (uint32_t)&conf_LLI2_DAC;
+	    	conf_LLI2_DAC.Control = ((WAVEFORM_SIZE<<0)
+	    							|(2<<18)
+	    							|(2<<21)
+	    							|(1<<26))
+	    							&~(1<<27);
+	    	conf_CH0_DAC.SrcMemAddr    = (uint32_t)dac_samples_2; //cambio*
+	    	conf_CH0_DAC.DMALLI        = (uint32_t)&conf_LLI2_DAC;
+
+
+	  	break;
+
+	  	default:
+	  	break;
+	  }
+
 	conf_CH0_DAC.ChannelNum    = 0;
 	conf_CH0_DAC.TransferSize  = WAVEFORM_SIZE;
 	conf_CH0_DAC.TransferWidth = 0;
-	conf_CH0_DAC.SrcMemAddr    = (uint32_t)dac_samples;
 	conf_CH0_DAC.DstMemAddr    = 0;
 	conf_CH0_DAC.TransferType  = GPDMA_TRANSFERTYPE_M2P;
 	conf_CH0_DAC.SrcConn       = 0;
 	conf_CH0_DAC.DstConn       = GPDMA_CONN_DAC;
-	conf_CH0_DAC.DMALLI        = (uint32_t)&conf_LLI0_DAC;
-	GPDMA_Setup(&conf_CH0_DAC);
+
+
+    GPDMA_Setup(&conf_CH0_DAC);
+  //AQUI FINALIZA EL CAMBIO
 	GPDMA_ChannelCmd(0,ENABLE);
 }
 
@@ -304,14 +345,8 @@ void ADC_IRQHandler()	//CADA VEZ QUE TERMINA LA CONVERSION DE UN CANAL ENTRA
 
 void EINT0_IRQHandler(){
 
-  GPDMA_ChannelCmd(0,DISABLE);
-  confDAC_OFF();
-
   select_wf = (select_wf + 1)%CANT_WF; //BUFFER CIRCULAR DE FORMAS DE ONDAS
-  saveWaveForm(select_wf);
-
-  confDAC();
-  confGPDMA();
+  confGPDMA(select_wf);
 
   EXTI_ClearEXTIFlag(EXTI_EINT0);
 }
@@ -327,7 +362,6 @@ void EINT2_IRQHandler(){
 
   select_fs = (select_fs + 1) % FS_SIZE;  //BUFFFER CIRCULAR DE FRECUENCIAS
   confDAC();
-
   EXTI_ClearEXTIFlag(EXTI_EINT2);
 }
 
@@ -376,36 +410,30 @@ void genWaveForms ()
   gen_cuadrada();
   gen_triangular();
 }
-void saveWaveForm(wf_t select)
-{
-  volatile uint32_t *index = dac_samples; //INICIO DE DE GUARDADO DE FORMA DE ONDA
-  switch(select)
-  {
-    case CUADRADA:
+void saveWaveForm(){
+  volatile uint32_t *index = dac_samples_0; //INICIO DE DE GUARDADO DE FORMA DE ONDA CUADRADA
+
   		for(uint32_t i=0; i<WAVEFORM_SIZE; i++)
       {
         *index = cuadrada[i]<<6;
         index++;
       }
-  	break;
 
-    case TRIANGULAR:
+  	index = dac_samples_1; //INICIO DE DE GUARDADO DE FORMA DE ONDA TRIANGULAR
+
   		for(uint32_t i=0; i<WAVEFORM_SIZE; i++)
       {
         *index = triangular[i]<<6;
         index++;
       }
-  	break;
 
-    case SENOIDAL:
+  	index = dac_samples_2; //INICIO DE DE GUARDADO DE FORMA DE ONDA SENOIDAL
+
   		for(uint32_t i=0; i<WAVEFORM_SIZE; i++)
       {
         *index = senoidal[i]<<6;
         index++;
       }
-  	break;
-
-  	default:
-  	break;
-  }
 }
+
+
