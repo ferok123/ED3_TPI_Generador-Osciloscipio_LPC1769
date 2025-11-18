@@ -20,8 +20,14 @@
 #include <lpc17xx_dac.h>
 #include <lpc17xx_gpdma.h>
 #include <lpc17xx_uart.h>
+#include <lpc17xx_gpio.h>
 
 //DEFINICION DE MACROS Y CONSTANTES:
+#define PIN_27 ((uint32_t) (1<<27))
+#define PIN_28 ((uint32_t) (1<<28))
+#define OUTPUT 1
+#define PORT_0 0
+
 #define FREC_ADC 200000
 #define DAC_BUFFER_START_0 0X2007C000 //CUADRADA
 #define DAC_BUFFER_START_1 0X2007D000	//TRIANGULAR
@@ -50,7 +56,7 @@ static const uint32_t DAC_frec[FS_SIZE] ={  //EL NUMERO LUEGO HAY QUE CALCULARLO
   6545,		//TICKS -> 10Hz
   654,		//TICKS -> 100Hz
   65,			//TICKS -> 1kHz
-  33				//TICKS -> 33KHz
+  33				//TICKS -> 2KHz
 };
 
 //GENERAMOS LAS OPCIONES DE FORMA DE ONDA
@@ -69,7 +75,7 @@ volatile uint32_t *dac_samples_0 = (volatile uint32_t *)DAC_BUFFER_START_0;
 volatile uint32_t *dac_samples_1 = (volatile uint32_t *)DAC_BUFFER_START_1;
 volatile uint32_t *dac_samples_2 = (volatile uint32_t *)DAC_BUFFER_START_2;
 
-uint16_t adc_value_CH0 = 0;
+uint32_t adc_value_CH0;
 
 uint16_t triangular[WAVEFORM_SIZE];		//VECTORES CON FORMAS DE ONDAS
 uint16_t cuadrada[WAVEFORM_SIZE];
@@ -112,6 +118,7 @@ void saveWaveForm();
 void gen_cuadrada(void);
 void gen_triangular(void);
 void genWaveForms(void);
+void confUART(void);
 
 //FUNCION PRINCIPAL:
 int main()
@@ -122,6 +129,7 @@ int main()
   confIntExt();
   confADC();
   confDAC();
+  confUART();
  // confGPDMA(select_wf);
   while(1)
   {
@@ -148,7 +156,7 @@ void confPines(void)
   PINSEL_ConfigPin(&pinEINT0);
 
 
-  //EINT1 -> SELECCION DE AMPLITUD
+  //EINT1 -> SELECCION DE FRECUENCIA
   PINSEL_CFG_Type pinEINT1; //EINT 1 EN P2.11
 	pinEINT1.Portnum = PINSEL_PORT_2; //SELECCION DE PUERTO
 	pinEINT1.Pinnum = PINSEL_PIN_11;
@@ -157,7 +165,7 @@ void confPines(void)
 	pinEINT1.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
   PINSEL_ConfigPin(&pinEINT1);
 
-  //EINT2 -> SELECCION DE BASE DE TIEMPO
+  //EINT2 -> AUMENTA AMPLITUD (AMPLIFICA)
   PINSEL_CFG_Type pinEINT2; //EINT 2 EN P2.12
 	pinEINT2.Portnum = PINSEL_PORT_2;
 	pinEINT2.Pinnum = PINSEL_PIN_12;
@@ -165,6 +173,36 @@ void confPines(void)
 	pinEINT2.Pinmode = PINSEL_PINMODE_PULLUP;//PULL-UP
 	pinEINT2.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
   PINSEL_ConfigPin(&pinEINT2);
+
+  //EINT3 -> BAJA AMPLITUD (ATENUA)
+  PINSEL_CFG_Type pinEINT3; //EINT 2 EN P2.13
+	pinEINT3.Portnum = PINSEL_PORT_0;
+	pinEINT3.Pinnum = PINSEL_PIN_13;
+	pinEINT3.Funcnum = PINSEL_FUNC_1; //EINT0
+	pinEINT3.Pinmode = PINSEL_PINMODE_PULLUP;//PULL-UP
+	pinEINT3.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
+  PINSEL_ConfigPin(&pinEINT3);
+
+  //P0.27-> INC (FLANCO DE BAJADA)
+  PINSEL_CFG_Type pinINC_pote = {0};
+	pinINC_pote.Portnum = PINSEL_PORT_0;
+	pinINC_pote.Pinnum = PINSEL_PIN_27;
+	pinINC_pote.Funcnum = PINSEL_FUNC_0; //GPIO
+	pinINC_pote.Pinmode = PINSEL_PINMODE_TRISTATE;// ES SALIDA
+	pinINC_pote.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
+  PINSEL_ConfigPin(&pinINC_pote);
+  GPIO_SetDir(PINSEL_PORT_0, PIN_27, OUTPUT); //GPIO COMO SALIDA
+
+
+   //P0.28-> U/D (UP/DOWN)
+  PINSEL_CFG_Type pinUD_pote = {0};
+	pinUD_pote.Portnum = PINSEL_PORT_0;
+	pinUD_pote.Pinnum = PINSEL_PIN_28;
+	pinUD_pote.Funcnum = PINSEL_FUNC_0; //GPIO
+	pinUD_pote.Pinmode = PINSEL_PINMODE_TRISTATE;// ES SALIDA
+	pinUD_pote.OpenDrain = PINSEL_PINMODE_NORMAL; //NORMAL, SIN OPEN DRAIN
+  PINSEL_ConfigPin(&pinUD_pote);
+  GPIO_SetDir(PINSEL_PORT_0, PIN_28, OUTPUT); //GPIO COMO SALIDA
 
 
   //CONFIGURMAOS PIN DAC P0.26
@@ -203,6 +241,8 @@ void confPines(void)
   pinRXD2.OpenDrain = PINSEL_PINMODE_NORMAL;
   PINSEL_ConfigPin(&pinRXD2);
 
+  //
+
 }
 
 void confIntExt(void)
@@ -224,10 +264,15 @@ void confIntExt(void)
   pinEINT.EXTI_Line = EXTI_EINT2;
   EXTI_Config(&pinEINT);
 
+  //EINT2
+   pinEINT.EXTI_Line = EXTI_EINT3;
+   EXTI_Config(&pinEINT);
   //HABILITACION INTERRUPCION
   NVIC_EnableIRQ(EINT0_IRQn);
   NVIC_EnableIRQ(EINT1_IRQn);
   NVIC_EnableIRQ(EINT2_IRQn);
+  NVIC_EnableIRQ(EINT3_IRQn);
+
 }
 
 void confADC(void)
@@ -240,7 +285,7 @@ void confADC(void)
   ADC_ChannelCmd(LPC_ADC, ADC_CHANNEL_0, ENABLE);	//HABILITAMOS EL CANAL0
   ADC_IntConfig(LPC_ADC, ADC_ADINTEN0, ENABLE); //HABILITAMOS INTERRUPCION PARA CANAL0
 
-  //NVIC_EnableIRQ(ADC_IRQn); //HABILITAMOS INTERRUPCION DE ADC PARA EL CORE
+  NVIC_EnableIRQ(ADC_IRQn); //HABILITAMOS INTERRUPCION DE ADC PARA EL CORE
 }
 
 void confDAC()
@@ -336,13 +381,28 @@ void confGPDMA(wf_t select){
 	GPDMA_ChannelCmd(0,ENABLE);
 }
 
+void confUART(void)
+{
+  UART_CFG_Type cfgUART_ADC = {0};
+  UART_ConfigStructInit(&cfgUART_ADC);
+  UART_Init(LPC_UART2, &cfgUART_ADC);
+  UART_TxCmd(LPC_UART2, ENABLE);
+
+  UART_FIFO_CFG_Type cfgUART_ADC_FIFO = {0};
+  UART_FIFOConfigStructInit(&cfgUART_ADC_FIFO);
+  UART_FIFOConfig(LPC_UART2, &cfgUART_ADC_FIFO);
+}
+
 
 void ADC_IRQHandler()	//CADA VEZ QUE TERMINA LA CONVERSION DE UN CANAL ENTRA
 {
-	if(ADC_ChannelGetStatus(LPC_ADC, ADC_CHANNEL_0, ADC_DATA_DONE)) //TERMINO DONE DE AD0.0?
+	//if(ADC_ChannelGetStatus(LPC_ADC, ADC_CHANNEL_0, ADC_DATA_DONE)) //TERMINO DONE DE AD0.0?
 	adc_value_CH0 = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);		//GUARDO DATO EN adc_value_CH0
+	//UART_Send(LPC_UART2, (uint8_t *) &adc_value_CH0, sizeof(adc_value_CH0), BLOCKING); // ENVIO DE DATOS DEL ADC AL UART
+	//AL USAR UART_Send() nos da un Hardfoult Handler (hay que ver su NVIC)
 }
 
+//INTERRUPCION PARA SELECCION DE FORMA DE ONDA
 void EINT0_IRQHandler(){
 
   select_wf = (select_wf + 1)%CANT_WF; //BUFFER CIRCULAR DE FORMAS DE ONDAS
@@ -351,18 +411,34 @@ void EINT0_IRQHandler(){
   EXTI_ClearEXTIFlag(EXTI_EINT0);
 }
 
-//INTERRUPCION PARA SELECCION DE LA AMPLITUD
+//INTERRUPCION PARA SELECCION DE FRECUENCIAS
 void EINT1_IRQHandler(){
-
+ select_fs = (select_fs + 1) % FS_SIZE;  //BUFFFER CIRCULAR DE FRECUENCIAS
+ confDAC();
   EXTI_ClearEXTIFlag(EXTI_EINT1);
 }
 
-//INTERRUPCION PARA SELECCION DE LA BASE DE TIEMPO
+//INTERRUPCION PARA INCREMENTO DE AMPLITUD EN POTENCIOMETRO --> U/D= 1  INC=  ---__
 void EINT2_IRQHandler(){
+  GPIO_SetValue(PORT_0, PIN_27);	//INC ALTO
+  GPIO_SetValue(PORT_0, PIN_28); // U/D -> 1
 
-  select_fs = (select_fs + 1) % FS_SIZE;  //BUFFFER CIRCULAR DE FRECUENCIAS
-  confDAC();
   EXTI_ClearEXTIFlag(EXTI_EINT2);
+
+  GPIO_ClearValue(PORT_0, PIN_27);	//INC BAJO
+
+}
+
+//INTERRUPCION PARA DECREMENTO DE AMPLITUD EN POTENCIOMETRO --> U/D= 0  INC=  ---__
+void EINT3_IRQHandler(){
+
+  GPIO_SetValue(PORT_0, PIN_27);	//INC ALTO
+  GPIO_ClearValue(PORT_0, PIN_28); // U/D -> 0
+
+  EXTI_ClearEXTIFlag(EXTI_EINT3);
+
+  GPIO_ClearValue(PORT_0, PIN_27);	//INC BAJO
+
 }
 
 
