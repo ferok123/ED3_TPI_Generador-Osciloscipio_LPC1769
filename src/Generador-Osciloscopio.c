@@ -119,6 +119,8 @@ void gen_cuadrada(void);
 void gen_triangular(void);
 void genWaveForms(void);
 void confUART(void);
+void uart_send_uint16_ascii(uint16_t value);
+
 
 //FUNCION PRINCIPAL:
 int main()
@@ -133,6 +135,8 @@ int main()
  // confGPDMA(select_wf);
   while(1)
   {
+	adc_value_CH0 = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);		//GUARDO DATO EN adc_value_CH0
+	uart_send_uint16_ascii(adc_value_CH0);
 
   }
 
@@ -283,9 +287,10 @@ void confADC(void)
 
   //CHANNEL 0:
   ADC_ChannelCmd(LPC_ADC, ADC_CHANNEL_0, ENABLE);	//HABILITAMOS EL CANAL0
-  ADC_IntConfig(LPC_ADC, ADC_ADINTEN0, ENABLE); //HABILITAMOS INTERRUPCION PARA CANAL0
+ // ADC_IntConfig(LPC_ADC, ADC_ADINTEN0, ENABLE); //HABILITAMOS INTERRUPCION PARA CANAL0
 
-  NVIC_EnableIRQ(ADC_IRQn); //HABILITAMOS INTERRUPCION DE ADC PARA EL CORE
+  //NVIC_EnableIRQ(ADC_IRQn); //HABILITAMOS INTERRUPCION DE ADC PARA EL CORE
+
 }
 
 void confDAC()
@@ -400,6 +405,8 @@ void ADC_IRQHandler()	//CADA VEZ QUE TERMINA LA CONVERSION DE UN CANAL ENTRA
 	adc_value_CH0 = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);		//GUARDO DATO EN adc_value_CH0
 	//UART_Send(LPC_UART2, (uint8_t *) &adc_value_CH0, sizeof(adc_value_CH0), BLOCKING); // ENVIO DE DATOS DEL ADC AL UART
 	//AL USAR UART_Send() nos da un Hardfoult Handler (hay que ver su NVIC)
+	 //uart_send_uint16_ascii(adc_value_CH0);
+
 }
 
 //INTERRUPCION PARA SELECCION DE FORMA DE ONDA
@@ -512,4 +519,19 @@ void saveWaveForm(){
       }
 }
 
+void uart_send_uint16_ascii(uint16_t value)
+{
+    char buffer[7];   // ahora necesitas espacio para CR+LF
+    int i = 0;
 
+    if(value >= 1000) buffer[i++] = '0' + (value / 1000) % 10;
+    if(value >= 100)  buffer[i++] = '0' + (value / 100) % 10;
+    if(value >= 10)   buffer[i++] = '0' + (value / 10) % 10;
+
+    buffer[i++] = '0' + (value % 10);
+
+    buffer[i++] = '\r';   // ← necesario para muchos osciloscopios
+    buffer[i++] = '\n';   // ← salto de línea
+
+    UART_Send(LPC_UART2, (uint8_t*)buffer, i, NONE_BLOCKING);
+}
